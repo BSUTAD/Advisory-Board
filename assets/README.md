@@ -1,0 +1,1 @@
+Portraits and logos used in this proof of concept retain their respective owners’ rights. The repository’s MIT license applies to original site code, not to third-party photographs or trademarks. Confirm image publication permission before broader promotion.
