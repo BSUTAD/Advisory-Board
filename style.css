@@ -37,3 +37,14 @@ header{display:grid;grid-template-columns:1fr;gap:22px}.brand{gap:28px;align-ite
 #people .people-heading h2{max-width:850px;margin:0 0 20px}
 #people .people-heading>p:last-child{max-width:750px;color:var(--muted);font-size:18px;margin:0}
 @media(max-width:600px){.brand{grid-template-columns:40% minmax(0,1fr);gap:18px 16px}.brand-title p{font-size:12px}.brand-title h1 .title-line{display:inline-block}.intro{padding-bottom:20px}#people{padding-top:16px}#people .people-heading{padding:28px 24px;margin-bottom:36px}#people .people-heading h2{font-size:34px}#people .people-heading>p:last-child{font-size:16px}}
+
+/* Keep the desktop masthead proportional and show each portrait in full. */
+@media(min-width:601px){
+ .brand{grid-template-columns:minmax(180px,25%) minmax(0,1fr);column-gap:clamp(18px,3vw,50px)}
+ .brand img{max-width:360px}
+ .brand-title h1{font-size:clamp(28px,3.6vw,62px);line-height:1.06}
+ .profile img{height:clamp(300px,30vw,460px);object-fit:contain;object-position:center;background:#f1f0ef}
+ .profile:not(.feature) img{object-position:center}
+ .profile.feature img{height:100%;min-height:420px;max-height:640px;object-fit:contain;object-position:center;background:var(--yellow)}
+ .alumni-grid .profile img,.alumni-grid .profile img.award-photo{height:clamp(420px,46vw,640px);object-fit:contain;object-position:center;background:#e9e9e9}
+}
