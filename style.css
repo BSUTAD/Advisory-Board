@@ -48,3 +48,5 @@ header{display:grid;grid-template-columns:1fr;gap:22px}.brand{gap:28px;align-ite
  .profile.feature img{height:100%;min-height:420px;max-height:640px;object-fit:contain;object-position:center;background:var(--yellow)}
  .alumni-grid .profile img,.alumni-grid .profile img.award-photo{height:clamp(420px,46vw,640px);object-fit:contain;object-position:center;background:#e9e9e9}
 }
+
+@media(min-width:601px){.brand-title h1{font-size:clamp(28px,3.6vw,62px)!important}}
