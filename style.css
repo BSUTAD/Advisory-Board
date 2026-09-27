@@ -119,3 +119,16 @@ header{display:grid;grid-template-columns:1fr;gap:22px}.brand{gap:28px;align-ite
 @media(max-width:600px){
  .practice-gallery img,.practice-gallery figure:first-child img{height:auto;aspect-ratio:1.8}
 }
+
+/* Match the supplied alumni, quote, and lower gallery compositions. */
+.alumni-grid .profile img,.alumni-grid .profile img.award-photo{
+ height:auto;aspect-ratio:1.14;object-fit:cover;object-position:center top;background:transparent
+}
+.quote-avatar-dana img,.quote-avatar-sam img{
+ height:auto;max-width:none;position:absolute;left:50%;top:50%
+}
+.quote-avatar-dana img{width:145%;transform:translate(-50%,-50%)}
+.quote-avatar-sam img{width:210%;transform:translate(-50%,-22%)}
+.practice-gallery figure:nth-child(n+3) img{
+ height:auto;aspect-ratio:1.84;object-fit:cover;object-position:center 25%
+}
