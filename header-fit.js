@@ -6,10 +6,10 @@
      title.style.removeProperty('font-size');
      return;
    }
-   title.style.fontSize = '40px';
+   title.style.setProperty('font-size', '40px', 'important');
    const available = title.clientWidth;
    const measured = line.getBoundingClientRect().width;
-   if (available && measured) title.style.fontSize = (40 * available / measured) + 'px';
+   if (available && measured) title.style.setProperty('font-size', (40 * available / measured) + 'px', 'important');
  }
  const observer = new ResizeObserver(fitTitle);
  observer.observe(document.querySelector('.brand'));
