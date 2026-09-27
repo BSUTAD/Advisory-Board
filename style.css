@@ -137,3 +137,20 @@ header{display:grid;grid-template-columns:1fr;gap:22px}.brand{gap:28px;align-ite
 #people .profile:not(.feature) img:not([src$="nicholas-jackson.jpg"]){
  object-fit:cover;object-position:center
 }
+
+/* Phone opening: compact identity, headline, photograph, and invitation. */
+@media(max-width:600px){
+ header{padding:20px 0 16px;gap:18px}
+ .masthead{gap:14px}
+ .masthead .brand{grid-template-columns:36% minmax(0,1fr);gap:14px}
+ .masthead .brand-title h1{margin:0;line-height:1.04}
+ .bsu-logo{width:166px;justify-self:center}
+ header nav{font-size:13px;gap:8px;flex-wrap:wrap}
+ .intro{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto;min-height:0;padding:22px 0 26px;gap:18px}
+ .intro .hero-headline{grid-column:1;grid-row:1;padding:0;margin:0;font-size:clamp(36px,10.5vw,52px);line-height:.97}
+ .cover-photo{grid-column:1;grid-row:2;width:100%;height:auto;min-height:0;aspect-ratio:3/2}
+ .cover-photo img{object-position:center 55%}
+ .intro .intro-copy{grid-column:1;grid-row:3;align-self:start;margin:0;padding:0;max-width:none;font-size:18px;line-height:1.4}
+ .intro .intro-copy p{margin:0}
+ .intro .text-link{margin-top:16px;padding:12px 17px;font-size:15px}
+}
