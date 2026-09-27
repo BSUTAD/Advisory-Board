@@ -132,3 +132,8 @@ header{display:grid;grid-template-columns:1fr;gap:22px}.brand{gap:28px;align-ite
 .practice-gallery figure:nth-child(n+3) img{
  height:auto;aspect-ratio:1.84;object-fit:cover;object-position:center 25%
 }
+
+/* Fill the headshot frames so no pale contain margins remain. */
+#people .profile:not(.feature) img:not([src$="nicholas-jackson.jpg"]){
+ object-fit:cover;object-position:center
+}
