@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function verified() { return request.auth != null && request.auth.token.email_verified == true; }
+    function role() { return get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role; }
+    function staff() { return verified() && role() in ['faculty','admin']; }
+    function admin() { return verified() && role() == 'admin'; }
+    function own(id) { return verified() && request.auth.uid == id; }
+    function str(v,n) { return v is string && v.size() <= n; }
+    function email(v) { return str(v,254) && v.matches('^[^\\s@;,<>]+@[^\\s@;,<>]+[.][^\\s@;,<>]+$'); }
+    function image(v) { return str(v,2000) && (v.matches('^https://[^\\s<>]+$') || v.matches('^assets/[a-zA-Z0-9._-]+[.](jpg|jpeg|png|webp)$')); }
+    function validProfile(d) {
+      return d.keys().hasAll(['firstName','lastName','email','altEmail','phone','company','jobTitle','location','website','connection','specialties','bio','areas','newsletterOptIn','accountEmail','createdAt','updatedAt','updatedBy'])
+        && d.keys().hasOnly(['firstName','lastName','email','altEmail','phone','company','jobTitle','location','website','connection','specialties','bio','areas','newsletterOptIn','accountEmail','createdAt','updatedAt','updatedBy'])
+        && str(d.firstName,100) && d.firstName.size()>0 && str(d.lastName,100) && d.lastName.size()>0
+        && email(d.email) && (d.altEmail=='' || email(d.altEmail)) && email(d.accountEmail)
+        && str(d.phone,50) && str(d.company,200) && str(d.jobTitle,200) && str(d.location,200)
+        && str(d.website,2000) && (d.website=='' || d.website.matches('^https?://[^\\s<>]+$'))
+        && str(d.specialties,500) && str(d.bio,2000)
+        && d.connection in ['board','applicant','supporter','faculty']
+        && d.areas is list && d.areas.size()>0 && d.areas.size()<=10
+        && d.areas.toSet().size()==d.areas.size()
+        && d.areas.hasOnly(['event-design','event-management','exhibit','tad','graphic','fine-art','interactive','computer-science','illustration-animation','art-education'])
+        && d.newsletterOptIn is bool && d.createdAt is timestamp
+        && d.updatedAt==request.time && d.updatedBy==request.auth.uid;
+    }
+    match /profiles/{uid} {
+      allow get: if own(uid) || staff();
+      allow list: if staff() && request.query.limit<=250;
+      allow create: if own(uid) && validProfile(request.resource.data)
+        && request.resource.data.accountEmail==request.auth.token.email
+        && request.resource.data.createdAt==request.time;
+      allow update: if (own(uid) || admin()) && validProfile(request.resource.data)
+        && request.resource.data.createdAt==resource.data.createdAt
+        && request.resource.data.accountEmail==resource.data.accountEmail;
+      allow delete: if false;
+    }
+    match /memberAdmin/{uid} {
+      allow read: if staff();
+      allow create,update: if admin()
+        && exists(/databases/$(database)/documents/profiles/$(uid))
+        && request.resource.data.keys().hasAll(['status','notes','updatedAt','updatedBy'])
+        && request.resource.data.keys().hasOnly(['status','notes','updatedAt','updatedBy'])
+        && request.resource.data.status in ['not-started','waiting-for-reply','ready-for-contact','scheduled','needs-follow-up','needs-immediate-action','very-active','on-hold','removed']
+        && str(request.resource.data.notes,3000)
+        && request.resource.data.updatedAt==request.time && request.resource.data.updatedBy==request.auth.uid;
+      allow delete: if false;
+    }
+    match /roles/{uid} {
+      allow get: if own(uid) || admin();
+      allow list: if admin();
+      allow create,update: if admin() && request.auth.uid!=uid
+        && request.resource.data.keys().hasAll(['role','updatedAt','updatedBy'])
+        && request.resource.data.keys().hasOnly(['role','updatedAt','updatedBy'])
+        && request.resource.data.role in ['member','faculty','admin']
+        && request.resource.data.updatedAt==request.time && request.resource.data.updatedBy==request.auth.uid;
+      allow delete: if false;
+    }
+    function validAlbum(d) {
+      return d.keys().hasAll(['title','eventDate','location','description','coverURL','coverAlt','published','createdBy','createdAt','updatedAt'])
+        && d.keys().hasOnly(['title','eventDate','location','description','coverURL','coverAlt','published','createdBy','createdAt','updatedAt'])
+        && str(d.title,120) && d.title.size()>0 && str(d.eventDate,10) && d.eventDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && str(d.location,160) && str(d.description,2000) && image(d.coverURL)
+        && str(d.coverAlt,300) && d.coverAlt.size()>0 && d.published is bool
+        && str(d.createdBy,128) && d.createdAt is timestamp && d.updatedAt==request.time;
+    }
+    match /albums/{albumId} {
+      allow read: if resource.data.published==true || staff();
+      allow create: if staff() && validAlbum(request.resource.data)
+        && request.resource.data.createdBy==request.auth.uid && request.resource.data.createdAt==request.time;
+      allow update: if staff() && validAlbum(request.resource.data)
+        && request.resource.data.createdBy==resource.data.createdBy && request.resource.data.createdAt==resource.data.createdAt;
+      allow delete: if false;
+      match /photos/{photoId} {
+        allow read: if staff() || (resource.data.hidden==false && get(/databases/$(database)/documents/albums/$(albumId)).data.published==true);
+        allow create,update: if staff()
+          && exists(/databases/$(database)/documents/albums/$(albumId))
+          && request.resource.data.keys().hasAll(['url','alt','caption','credit','position','hidden','updatedAt'])
+          && request.resource.data.keys().hasOnly(['url','alt','caption','credit','position','hidden','updatedAt'])
+          && image(request.resource.data.url) && str(request.resource.data.alt,300) && request.resource.data.alt.size()>0
+          && str(request.resource.data.caption,500) && str(request.resource.data.credit,200)
+          && request.resource.data.position is int && request.resource.data.position>=0 && request.resource.data.position<=9999
+          && request.resource.data.hidden is bool && request.resource.data.updatedAt==request.time;
+        allow delete: if false;
+      }
+    }
+    match /{document=**} { allow read,write: if false; }
+  }
+}
