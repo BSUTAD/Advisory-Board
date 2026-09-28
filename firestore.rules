@@ -32,7 +32,8 @@ service cloud.firestore {
         && request.resource.data.createdAt==request.time;
       allow update: if (own(uid) || admin()) && validProfile(request.resource.data)
         && request.resource.data.createdAt==resource.data.createdAt
-        && request.resource.data.accountEmail==resource.data.accountEmail;
+        && (request.resource.data.accountEmail==resource.data.accountEmail
+          || (own(uid) && request.resource.data.accountEmail==request.auth.token.email));
       allow delete: if false;
     }
     match /memberAdmin/{uid} {
