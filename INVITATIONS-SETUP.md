@@ -1,6 +1,6 @@
 # Admin invitations
 
-Status: implemented and tested; awaiting Firebase rules publication and generated file deployment.
+Status: released September 28, 2026. Firebase rules published at 4:38 PM Central; generated portal files included in the activation commit.
 
 Admin workflow: Contact directory > Add contact / Create invitation. Enter login email, contact details and pathways, save, and copy the prepared invitation into Outlook. Nothing is sent automatically. Only the existing administrator role can manage invitations. They expire after 30 days and can be canceled. For corrections, cancel and replace the invitation.
 
