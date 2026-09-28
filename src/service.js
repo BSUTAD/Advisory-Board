@@ -1,7 +1,7 @@
 import {effectiveStatus} from './model.js';
 import {initializeApp} from 'firebase/app';
 import {getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,sendEmailVerification,sendPasswordResetEmail,reload,connectAuthEmulator,updatePassword,verifyBeforeUpdateEmail,EmailAuthProvider,reauthenticateWithCredential,deleteUser} from 'firebase/auth';
-import {getFirestore,doc,getDoc,getDocs,setDoc,updateDoc,collection,query,where,orderBy,limit,startAfter,serverTimestamp,runTransaction,connectFirestoreEmulator,writeBatch} from 'firebase/firestore';
+import {getFirestore,doc,getDoc,getDocs,setDoc,updateDoc,collection,query,where,orderBy,limit,startAfter,serverTimestamp,runTransaction,connectFirestoreEmulator,writeBatch,deleteDoc,Timestamp} from 'firebase/firestore';
 import {initializeAppCheck,ReCaptchaV3Provider} from 'firebase/app-check';
 let db,auth,sessionCallback;
 export let session={user:null,role:'member'};
@@ -23,7 +23,7 @@ export async function connect(onSession){
 }
 export const staff=()=>session.user?.emailVerified && ['faculty','admin'].includes(session.role);
 export const admin=()=>session.user?.emailVerified && session.role==='admin';
-const actionSettings=()=>({url:new URL('account.html',location.href).href});
+const actionSettings=()=>({url:new URL('account.html'+(sessionStorage.getItem('tad-invite')?'#invite='+encodeURIComponent(sessionStorage.getItem('tad-invite')):''),location.href).href});
 export async function register(email,password){const result=await createUserWithEmailAndPassword(auth,email,password);await sendEmailVerification(result.user,actionSettings());return result.user;}
 export const login=(email,password)=>signInWithEmailAndPassword(auth,email,password);
 export const logout=()=>signOut(auth);
@@ -76,4 +76,32 @@ export async function deleteAccount(password){
   await batch.commit();
   try {await deleteUser(user);}
   catch(error){throw Error('Your contact profile and directory information have been removed, but your login could not be deleted. Please retry Delete my account to finish. '+(error.code||''));}
+}
+
+export async function pendingInvitations(){return (await getDocs(query(collection(db,'invitations'),limit(250)))).docs.map(s=>({id:s.id,...s.data()}));}
+export async function createInvitation(p,loginEmail){
+  if(!admin())throw Error('Administrator access is required.');
+  const existing=await getDocs(query(collection(db,'profiles'),where('accountEmail','==',loginEmail),limit(1)));
+  if(!existing.empty)throw Error('This login email already has a profile. Use the directory to edit it, or ask the member to reset their password.');
+  const pending=await getDocs(query(collection(db,'invitations'),where('loginEmail','==',loginEmail),limit(1)));
+  if(!pending.empty)throw Error('An invitation already exists for this email. Copy that invitation, or cancel it before creating a replacement.');
+  const ref=doc(collection(db,'invitations'));const now=serverTimestamp();
+  const profile={...p,newsletterOptIn:false,accountEmail:loginEmail,createdAt:now,updatedAt:now,updatedBy:session.user.uid};
+  await setDoc(ref,{loginEmail,profile,createdAt:now,createdBy:session.user.uid,expiresAt:Timestamp.fromMillis(Date.now()+30*86400000)});
+  return ref.id;
+}
+export const cancelInvitation=id=>deleteDoc(doc(db,'invitations',id));
+export async function invitation(id){const s=await getDoc(doc(db,'invitations',id));if(!s.exists())throw Error('This invitation is no longer available. Ask the sender for a new one.');const i=s.data();if(i.expiresAt.toMillis()<Date.now())throw Error('This invitation has expired. Ask the sender for a new one.');return {id,...i};}
+export async function claimInvitation(id,p){
+  const user=session.user;
+  await runTransaction(db,async tx=>{
+    const ref=doc(db,'invitations',id),target=doc(db,'profiles',user.uid);
+    const invite=await tx.get(ref),old=await tx.get(target);
+    if(!invite.exists())throw Error('This invitation is no longer available.');
+    if(old.exists())throw Error('You already have a contact profile. Your information has not been overwritten. Ask the sender to cancel the duplicate invitation.');
+    if(invite.data().loginEmail!==user.email.toLowerCase()||invite.data().expiresAt.toMillis()<Date.now())throw Error('Sign in with the verified invited email, or request a new invitation.');
+    const now=serverTimestamp();
+    tx.set(target,{...p,accountEmail:user.email,createdAt:now,updatedAt:now,updatedBy:user.uid});
+    tx.delete(ref);
+  });
 }

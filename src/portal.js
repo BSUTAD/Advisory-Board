@@ -18,8 +18,14 @@ function profileFields(target,p={}){
 function formProfile(form){const f=new FormData(form);const p=Object.fromEntries([...textFields.map(([k])=>k),'connection','specialties','bio'].map(k=>[k,String(f.get(k)||'').trim()]));p.email=p.email.toLowerCase();p.altEmail=p.altEmail.toLowerCase();p.areas=f.getAll('areas');p.newsletterOptIn=f.get('newsletterOptIn')==='on';const error=validateProfile(p);if(error)throw Error(error);return p;}
 $$('[data-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));
 $('#sign-out').onclick=()=>perform($('#sign-out'),async()=>{await service.logout();notice('You have signed out.');});
+let claimId=null,pendingInvites=[];
+const incomingInvite=new URLSearchParams(location.hash.slice(1)).get('invite');
+if(page==='account'&&incomingInvite&&/^[A-Za-z0-9]{20}$/.test(incomingInvite))sessionStorage.setItem('tad-invite',incomingInvite);
 let connected=false, authMode='register', rows=[],shown=[],selected=new Set(),sortKey='lastName',sortDirection=1,editRecord=null,albums=[],currentAlbum=null,photos=[],emailRows=[],viewVersion=0;
 if(page==='account'){
+  $('#claim-intro').hidden=!sessionStorage.getItem('tad-invite');
+  if(sessionStorage.getItem('tad-invite'))$('#signup-email-hint').textContent='Use the email that received your invitation. After claiming your profile, you can change your login to a personal email.';
+  $('#dismiss-invite').onclick=()=>{sessionStorage.removeItem('tad-invite');location.href='account.html';};
   $('#delete-form').onsubmit=e=>{e.preventDefault();perform(e.submitter,async()=>{const f=new FormData(e.target);if(f.get('confirmDelete')!=='on')throw Error('Please confirm that you want to permanently delete your account.');try{await service.deleteAccount(f.get('password'));}finally{e.target.querySelector('[name=password]').value='';}e.target.reset();$('#profile-fields').replaceChildren();notice('Your account and contact profile have been deleted.','success','#auth-feedback');},'#delete-feedback');};
   function mode(next){authMode=next;$('#auth-form').hidden=false;$('#reset-form').hidden=true;$('#tab-register').setAttribute('aria-selected',String(next==='register'));$('#tab-login').setAttribute('aria-selected',String(next==='login'));$('#confirm-password-label').hidden=next==='login';$('#confirm-password-label input').required=next==='register';$('#auth-form [name=password]').autocomplete=next==='register'?'new-password':'current-password';$('#signup-note').hidden=next==='login';$('#signup-email-hint').hidden=next==='login';$('#password-hint').hidden=next==='login';$('#auth-submit').textContent=next==='register'?'Create account':'Sign in';}
   $('#tab-register').onclick=()=>mode('register');$('#tab-login').onclick=()=>mode('login');
@@ -28,7 +34,7 @@ if(page==='account'){
   $('#reset-form').onsubmit=e=>{e.preventDefault();if(!connected)return;perform(e.submitter,async()=>{await service.resetPassword(new FormData(e.target).get('email').trim());notice('If an account exists for that address, a password reset email will arrive shortly. Check your spam folder too.','success','#reset-feedback');},'#reset-feedback');};
   $('#check-verification').onclick=()=>perform($('#check-verification'),async()=>{await service.refreshSession();if(!service.session.user.emailVerified)notice('Your email has not been verified yet. Open the link in your email, then try again.','','#verification-feedback');},'#verification-feedback');
   $('#resend-verification').onclick=()=>perform($('#resend-verification'),async()=>{await service.verifyEmail();notice('Verification email sent. Check your inbox and junk/spam folder.','success','#verification-feedback');},'#verification-feedback');
-  $('#profile-form').onsubmit=e=>{e.preventDefault();perform(e.submitter,async()=>{await service.saveProfile(formProfile(e.target));notice('Your information has been saved.','success','#profile-feedback');},'#profile-feedback');};
+  $('#profile-form').onsubmit=e=>{e.preventDefault();perform(e.submitter,async()=>{if(claimId){await service.claimInvitation(claimId,formProfile(e.target));claimId=null;sessionStorage.removeItem('tad-invite');history.replaceState(null,'','account.html');$('#claim-intro').hidden=true;}else await service.saveProfile(formProfile(e.target));notice('Your information has been saved.','success','#profile-feedback');},'#profile-feedback');};
   $('#login-email-form').onsubmit=e=>{e.preventDefault();perform(e.submitter,async()=>{const email=new FormData(e.target).get('email').trim().toLowerCase();if(!emailValid(email))throw Error('Enter a valid email address.');if(email===service.session.user.email.toLowerCase())throw Error('That is already your login email.');await service.changeLoginEmail(email);e.target.reset();notice('Check '+email+' for a verification link, including your junk/spam folder. After verifying, sign out and sign in with your new email and existing password. Your profile and contact email will stay the same.','success','#login-email-feedback');},'#login-email-feedback');};
   $('#password-form').onsubmit=e=>{e.preventDefault();perform(e.submitter,async()=>{const f=new FormData(e.target);if(f.get('password')!==f.get('confirmPassword'))throw Error('The passwords do not match.');await service.changePassword(f.get('password'));e.target.reset();notice('Your password has been changed.','success','#password-feedback');},'#password-feedback');};
 }
@@ -47,11 +53,37 @@ function renderDirectory(){
   $$('[data-edit]').forEach(b=>b.onclick=()=>perform(b,()=>openContact(b.dataset.edit)));
   $('#prepare-emails').disabled=!shown.some(r=>selected.has(r.id));$('#select-filtered').disabled=!shown.length;$('#export-csv').disabled=!shown.length;
 }
-async function loadDirectory(){const version=++viewVersion;$('#loading').hidden=false;const fetched=await service.directory();if(version!==viewVersion||!service.staff())return;rows=fetched;selected.clear();renderDirectory();$('#loading').hidden=true;}
+async function loadDirectory(){const version=++viewVersion;$('#loading').hidden=false;const fetched=await service.directory();if(version!==viewVersion||!service.staff())return;rows=fetched;selected.clear();renderDirectory();$('#loading').hidden=true;await renderInvitations();}
 async function openContact(id){editRecord=rows.find(r=>r.id===id);profileFields('#edit-profile-fields',editRecord);$('#edit-status').value=editRecord.status;$('#edit-status').disabled=['faculty','admin'].includes(editRecord.role);$('#edit-contact-form [name=notes]').value=editRecord.notes;statusMeaning();notice('','','#edit-notice');$('#role-select').value=await service.accountRole(id);$('#save-role').disabled=id===service.session.user.uid;$('#edit-contact').showModal();}
 function statusMeaning(){const s=statusFor($('#edit-status').value);$('#edit-status').style.background=s.color;$('#edit-status').style.color=s.ink;$('#edit-status-meaning').textContent=s.meaning;}
+
+function invitationText(i){const url=new URL('account.html',location.href);url.hash='invite='+i.id;return `Hello ${i.profile.firstName},
+
+We have prepared your TAD Advisory Board contact profile so you will not need to enter everything again.
+
+${url.href}
+
+Open the link, create an account with ${i.loginEmail}, and choose your own password. If you already have a login, sign in instead or use Forgot password. Verify your email (check junk/spam), then return to the invitation to review your information, choose your pathway interests and newsletter preferences, and save. You can change your login email afterward.
+
+This invitation expires ${i.expiresAt.toDate().toLocaleDateString()}. If you cannot access that email, reply so we can replace the invitation.
+
+Thank you,
+TAD Advisory Board team`;}
+function showInvitation(i){$('#invitation-output').value=invitationText(i);$('#invitation-message').hidden=false;$('#invitation-message').scrollIntoView({block:'nearest'});}
+async function renderInvitations(){
+  $('#invitation-panel').hidden=!service.admin();
+  if(!service.admin()){pendingInvites=[];$('#invitation-list').replaceChildren();$('#invitation-output').value='';$('#invitation-message').hidden=true;return;}
+  pendingInvites=await service.pendingInvitations();
+  $('#invitation-list').innerHTML=pendingInvites.length?pendingInvites.map(i=>`<div class="session-summary"><div><strong>${esc(i.profile.firstName+' '+i.profile.lastName)}</strong><span class="subline">${esc(i.loginEmail)}</span><span class="hint">${i.expiresAt.toMillis()<Date.now()?'Expired':'Awaiting claim'} · expires ${esc(i.expiresAt.toDate().toLocaleDateString())}</span></div><div class="actions"><button class="button secondary small" data-invite-copy="${esc(i.id)}">Prepare email</button><button class="link-button" data-invite-cancel="${esc(i.id)}">Cancel invitation</button></div></div>`).join(''):'<p class="muted">No invitations awaiting a claim.</p>';
+  $$('[data-invite-copy]').forEach(b=>b.onclick=()=>showInvitation(pendingInvites.find(i=>i.id===b.dataset.inviteCopy)));
+  $$('[data-invite-cancel]').forEach(b=>b.onclick=()=>perform(b,async()=>{await service.cancelInvitation(b.dataset.inviteCancel);$('#invitation-message').hidden=true;await renderInvitations();notice('Invitation canceled. That link can no longer be claimed.','success','#invitation-feedback');},'#invitation-feedback'));
+}
+
 function prepareEmails(){const result=recipients(emailRows,$('#email-purpose').value);$('#email-output').value=result.emails.join('; ');$('#email-summary').textContent=`${result.emails.length} unique recipients · ${result.excluded} excluded because of status, subscription preference, or an invalid email.`;$('#copy-emails').disabled=!result.emails.length;$('#copy-status').textContent='';}
 if(page==='directory'){
+  $('#new-invitation').onclick=()=>{$('#invitation-form').reset();profileFields('#invitation-fields',{connection:'applicant'});$('#invitation-fields [name=newsletterOptIn]').closest('fieldset').hidden=true;notice('','','#invitation-form-feedback');$('#create-invitation').showModal();};
+  $('#invitation-form').onsubmit=e=>{e.preventDefault();perform(e.submitter,async()=>{const p=formProfile(e.target),email=e.target.elements.loginEmail.value.trim().toLowerCase();if(!emailValid(email))throw Error('Enter a valid invitation email.');p.newsletterOptIn=false;const id=await service.createInvitation(p,email);$('#create-invitation').close();await renderInvitations();showInvitation(pendingInvites.find(i=>i.id===id));notice('Profile saved for invitation. Copy the message below and send it from Outlook.','success','#invitation-feedback');},'#invitation-form-feedback');};
+  $('#copy-invitation').onclick=()=>perform($('#copy-invitation'),async()=>{try{await navigator.clipboard.writeText($('#invitation-output').value);notice('Copied. Paste into an Outlook email to the invited person.','success','#invitation-feedback');}catch{$('#invitation-output').focus();$('#invitation-output').select();notice('Select and copy the invitation above, then paste into Outlook.','','#invitation-feedback');}},'#invitation-feedback');
   for(const s of STATUSES){$('#status-filter').add(new Option(s.label,s.id));$('#edit-status').add(new Option(s.label,s.id));}
   CONNECTIONS.forEach(c=>$('#connection-filter').add(new Option(c.label,c.id)));$('#status-filter').value='';$('#connection-filter').value='';$('#area-filters').innerHTML=areaOptions('filter');$('#status-key').innerHTML=STATUSES.map(s=>`<div>${badge(s)}<p>${esc(s.meaning)}</p></div>`).join('');
   $$('.filters input,.filters select').forEach(el=>el.addEventListener('input',()=>{selected.clear();renderDirectory();}));
@@ -93,11 +125,11 @@ async function sessionChanged(session){
     $('#delete-panel').hidden=!session.user;
     $('#auth-submit').disabled=false;$('#auth-panel').hidden=!!session.user;$('#verification-panel').hidden=!session.user||session.user.emailVerified;$('#profile-panel').hidden=!session.user?.emailVerified;
     if(session.user&&!session.user.emailVerified)$('#verification-email').textContent=session.user.email;
-    if(session.user?.emailVerified){const p=await service.profile();profileFields('#profile-fields',p||{email:session.user.email});$('#signed-in-name').textContent=p?`${p.firstName} ${p.lastName}`:'Your TAD account';$('#signed-in-email').textContent=' · '+session.user.email;$('#access-label').textContent={member:'Member account',faculty:'Faculty',admin:'Administrator'}[session.role];}
+    if(session.user?.emailVerified){const p=await service.profile();profileFields('#profile-fields',p||{email:session.user.email});claimId=null;const inviteId=sessionStorage.getItem('tad-invite');if(inviteId){try{const i=await service.invitation(inviteId);if(p)throw Error('You already have a saved profile. We have kept your existing information. Ask the sender to cancel this duplicate invitation.');profileFields('#profile-fields',i.profile);claimId=inviteId;notice('Your prefilled profile is ready. Review it, select your newsletter preference, and save to claim it.','','#profile-feedback');}catch(error){notice('The invitation could not be loaded. Check that you verified the email that received it. '+friendly(error),'error','#profile-feedback');}}$('#signed-in-name').textContent=p?`${p.firstName} ${p.lastName}`:'Your TAD account';$('#signed-in-email').textContent=' · '+session.user.email;$('#access-label').textContent={member:'Member account',faculty:'Faculty',admin:'Administrator'}[session.role];}
   }
   if(page==='directory'){
     $('#directory-gate').hidden=!!service.staff();$('#directory-panel').hidden=!service.staff();
-    if(service.staff()){$('#directory-access').textContent=service.admin()?'Administrator · edit contact details and statuses, manage access, and create albums.':'Faculty · view and filter contacts, copy email lists, and create albums. Contact editing is reserved for admins.';await loadDirectory();}else{viewVersion++;rows=[];shown=[];selected.clear();$('#directory-rows').replaceChildren();$$('dialog[open]').forEach(d=>d.close());}
+    if(service.staff()){$('#directory-access').textContent=service.admin()?'Administrator · edit contact details and statuses, manage access, and create albums.':'Faculty · view and filter contacts, copy email lists, and create albums. Contact editing is reserved for admins.';await loadDirectory();}else{await renderInvitations();viewVersion++;rows=[];shown=[];selected.clear();$('#directory-rows').replaceChildren();$$('dialog[open]').forEach(d=>d.close());}
   }
   if(page==='albums'){$('#new-album').hidden=!service.staff();await renderAlbums();}
 }
