@@ -59,6 +59,26 @@ service cloud.firestore {
         && request.resource.data.updatedAt==request.time && request.resource.data.updatedBy==request.auth.uid;
       allow delete: if deletingOwn(uid);
     }
+    match /invitations/{id} {
+      function invited() { return verified() && resource.data.loginEmail==request.auth.token.email.lower() && resource.data.expiresAt>request.time; }
+      allow get: if admin() || invited();
+      allow list: if admin() && request.query.limit<=250;
+      allow create: if admin()
+        && request.resource.data.keys().hasOnly(['loginEmail','profile','createdAt','createdBy','expiresAt'])
+        && email(request.resource.data.loginEmail)
+        && request.resource.data.loginEmail==request.resource.data.loginEmail.lower()
+        && validProfile(request.resource.data.profile)
+        && request.resource.data.profile.accountEmail==request.resource.data.loginEmail
+        && request.resource.data.profile.createdAt==request.time
+        && request.resource.data.profile.newsletterOptIn==false
+        && request.resource.data.createdAt==request.time && request.resource.data.createdBy==request.auth.uid
+        && request.resource.data.expiresAt>request.time
+        && request.resource.data.expiresAt<=request.time+duration.value(31,'d');
+      allow update: if false;
+      allow delete: if admin() || (invited()
+        && !exists(/databases/$(database)/documents/profiles/$(request.auth.uid))
+        && getAfter(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.accountEmail==request.auth.token.email);
+    }
     function validAlbum(d) {
       return d.keys().hasAll(['title','eventDate','location','description','coverURL','coverAlt','published','createdBy','createdAt','updatedAt'])
         && d.keys().hasOnly(['title','eventDate','location','description','coverURL','coverAlt','published','createdBy','createdAt','updatedAt'])
