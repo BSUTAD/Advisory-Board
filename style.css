@@ -154,3 +154,6 @@ header{display:grid;grid-template-columns:1fr;gap:22px}.brand{gap:28px;align-ite
  .intro .intro-copy p{margin:0}
  .intro .text-link{margin-top:16px;padding:12px 17px;font-size:15px}
 }
+
+/* Keep wrapped phone navigation grouped at the left. */
+@media(max-width:600px){header nav{justify-content:flex-start;gap:10px 22px}}
