@@ -1,6 +1,6 @@
 import {effectiveStatus} from './model.js';
 import {initializeApp} from 'firebase/app';
-import {getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,sendEmailVerification,sendPasswordResetEmail,reload,connectAuthEmulator,updatePassword} from 'firebase/auth';
+import {getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,sendEmailVerification,sendPasswordResetEmail,reload,connectAuthEmulator,updatePassword,verifyBeforeUpdateEmail} from 'firebase/auth';
 import {getFirestore,doc,getDoc,getDocs,setDoc,updateDoc,collection,query,where,orderBy,limit,startAfter,serverTimestamp,runTransaction,connectFirestoreEmulator} from 'firebase/firestore';
 import {initializeAppCheck,ReCaptchaV3Provider} from 'firebase/app-check';
 let db,auth,sessionCallback;
@@ -29,12 +29,13 @@ export const login=(email,password)=>signInWithEmailAndPassword(auth,email,passw
 export const logout=()=>signOut(auth);
 export const resetPassword=email=>sendPasswordResetEmail(auth,email,actionSettings());
 export const changePassword=password=>updatePassword(auth.currentUser,password);
+export const changeLoginEmail=email=>verifyBeforeUpdateEmail(auth.currentUser,email,actionSettings());
 export const verifyEmail=()=>sendEmailVerification(auth.currentUser,actionSettings());
 export async function refreshSession(){await reload(auth.currentUser);await auth.currentUser.getIdToken(true);session.user=auth.currentUser;if(session.user.emailVerified){const r=await getDoc(doc(db,'roles',session.user.uid));session.role=r.exists()?r.data().role:'member';}sessionCallback(session);}
 export async function profile(id=session.user.uid){const s=await getDoc(doc(db,'profiles',id));return s.exists()?{id:s.id,...s.data()}:null;}
 export async function saveProfile(p,id=session.user.uid){
   return runTransaction(db,async tx=>{const ref=doc(db,'profiles',id);const before=await tx.get(ref);const now=serverTimestamp();
-    if(before.exists())tx.update(ref,{...p,updatedAt:now,updatedBy:session.user.uid});
+    if(before.exists())tx.update(ref,{...p,...(id===session.user.uid?{accountEmail:session.user.email}:{}),updatedAt:now,updatedBy:session.user.uid});
     else tx.set(ref,{...p,accountEmail:session.user.email,createdAt:now,updatedAt:now,updatedBy:session.user.uid});
   });
 }
