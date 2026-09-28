@@ -59,7 +59,7 @@ service cloud.firestore {
     function validAlbum(d) {
       return d.keys().hasAll(['title','eventDate','location','description','coverURL','coverAlt','published','createdBy','createdAt','updatedAt'])
         && d.keys().hasOnly(['title','eventDate','location','description','coverURL','coverAlt','published','createdBy','createdAt','updatedAt'])
-        && str(d.title,120) && d.title.size()>0 && str(d.eventDate,10) && d.eventDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && str(d.title,120) && d.title.size()>0 && str(d.eventDate,10) && (d.eventDate=='' || d.eventDate.matches('^[0-9]{4}(-[0-9]{2}-[0-9]{2})?$'))
         && str(d.location,160) && str(d.description,2000) && image(d.coverURL)
         && str(d.coverAlt,300) && d.coverAlt.size()>0 && d.published is bool
         && str(d.createdBy,128) && d.createdAt is timestamp && d.updatedAt==request.time;
