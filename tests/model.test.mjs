@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {recipients,filterContacts,sortContacts,imageURL,csv,validateProfile,effectiveStatus} from '../src/model.js';
 import {AREAS,STATUSES} from '../src/key.js';
-const base={firstName:'A',lastName:'Person',email:'a@example.org',altEmail:'',areas:['graphic','illustration-animation'],newsletterOptIn:true,status:'very-active'};
+const base={connection:'active',firstName:'A',lastName:'Person',email:'a@example.org',altEmail:'',areas:['graphic','illustration-animation'],newsletterOptIn:true,status:'very-active'};
 test('newsletter recipients respect consent, holds/removals, validation and duplicates',()=>{
  const result=recipients([base,{...base,email:'A@EXAMPLE.ORG'},{...base,email:'b@example.org',newsletterOptIn:false},{...base,email:'c@example.org',status:'on-hold'},{...base,email:'d@example.org',status:'removed'},{...base,email:'bad\nBcc:other@example.org'}]);assert.deepEqual(result.emails,['a@example.org']);assert.equal(result.excluded,4);
  assert.equal(recipients([base,{...base,email:'b@example.org',newsletterOptIn:false}],'board').emails.length,2);
@@ -12,3 +12,5 @@ test('image links reject script, data and filesystem URLs',()=>{for(const url of
 test('workbook key has the original key plus Ineligible and ten pathways',()=>{assert.equal(STATUSES.length,10);assert.equal(AREAS.length,10);assert.equal(STATUSES.find(s=>s.id==='needs-immediate-action').color,'#C00000');assert.equal(AREAS.find(a=>a.id==='interactive').color,'#385724');assert.equal(validateProfile({...base,areas:[]}), 'Please select at least one program area.');});
 
 test('staff are automatically ineligible and excluded from both email modes',()=>{for(const role of ['faculty','admin']){assert.equal(effectiveStatus('very-active',role),'ineligible');for(const mode of ['newsletter','board'])assert.equal(recipients([{...base,role}],mode).emails.length,0);}assert.equal(effectiveStatus('very-active','member'),'very-active');assert.equal(recipients([{...base,status:'ineligible'}],'board').emails.length,0);});
+
+test('newsletters-only contacts stay out of board coordination',()=>{const p={...base,connection:'supporter'};assert.equal(recipients([p],'board').emails.length,0);assert.equal(recipients([p]).emails.length,1);assert.equal(validateProfile({...base,connection:'invented'}),'Please choose your connection to TAD.');});
