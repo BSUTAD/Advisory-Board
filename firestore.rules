@@ -6,6 +6,8 @@ service cloud.firestore {
     function staff() { return verified() && role() in ['faculty','admin']; }
     function admin() { return verified() && role() == 'admin'; }
     function own(id) { return verified() && request.auth.uid == id; }
+    function deletingOwn(id) { return request.auth != null && request.auth.uid == id
+      && request.auth.token.auth_time * 1000 >= request.time.toMillis() - 300000; }
     function str(v,n) { return v is string && v.size() <= n; }
     function email(v) { return str(v,254) && v.matches('^[^\\s@;,<>]+@[^\\s@;,<>]+[.][^\\s@;,<>]+$'); }
     function image(v) { return str(v,2000) && (v.matches('^https://[^\\s<>]+$') || v.matches('^assets/[a-zA-Z0-9._-]+[.](jpg|jpeg|png|webp)$')); }
@@ -17,7 +19,7 @@ service cloud.firestore {
         && str(d.phone,50) && str(d.company,200) && str(d.jobTitle,200) && str(d.location,200)
         && str(d.website,2000) && (d.website=='' || d.website.matches('^https?://[^\\s<>]+$'))
         && str(d.specialties,500) && str(d.bio,2000)
-        && d.connection in ['board','applicant','supporter','faculty']
+        && d.connection in ['active','board','applicant','supporter','faculty']
         && d.areas is list && d.areas.size()>0 && d.areas.size()<=10
         && d.areas.toSet().size()==d.areas.size()
         && d.areas.hasOnly(['event-design','event-management','exhibit','tad','graphic','fine-art','interactive','computer-science','illustration-animation','art-education'])
@@ -34,7 +36,7 @@ service cloud.firestore {
         && request.resource.data.createdAt==resource.data.createdAt
         && (request.resource.data.accountEmail==resource.data.accountEmail
           || (own(uid) && request.resource.data.accountEmail==request.auth.token.email));
-      allow delete: if false;
+      allow delete: if deletingOwn(uid);
     }
     match /memberAdmin/{uid} {
       allow read: if staff();
@@ -45,7 +47,7 @@ service cloud.firestore {
         && request.resource.data.status in ['not-started','waiting-for-reply','ready-for-contact','scheduled','needs-follow-up','needs-immediate-action','very-active','on-hold','removed','ineligible']
         && str(request.resource.data.notes,3000)
         && request.resource.data.updatedAt==request.time && request.resource.data.updatedBy==request.auth.uid;
-      allow delete: if false;
+      allow delete: if deletingOwn(uid);
     }
     match /roles/{uid} {
       allow get: if own(uid) || staff();
@@ -55,7 +57,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['role','updatedAt','updatedBy'])
         && request.resource.data.role in ['member','faculty','admin']
         && request.resource.data.updatedAt==request.time && request.resource.data.updatedBy==request.auth.uid;
-      allow delete: if false;
+      allow delete: if deletingOwn(uid);
     }
     function validAlbum(d) {
       return d.keys().hasAll(['title','eventDate','location','description','coverURL','coverAlt','published','createdBy','createdAt','updatedAt'])
