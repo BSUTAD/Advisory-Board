@@ -1,7 +1,7 @@
 import {effectiveStatus} from './model.js';
 import {initializeApp} from 'firebase/app';
-import {getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,sendEmailVerification,sendPasswordResetEmail,reload,connectAuthEmulator,updatePassword,verifyBeforeUpdateEmail} from 'firebase/auth';
-import {getFirestore,doc,getDoc,getDocs,setDoc,updateDoc,collection,query,where,orderBy,limit,startAfter,serverTimestamp,runTransaction,connectFirestoreEmulator} from 'firebase/firestore';
+import {getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,sendEmailVerification,sendPasswordResetEmail,reload,connectAuthEmulator,updatePassword,verifyBeforeUpdateEmail,EmailAuthProvider,reauthenticateWithCredential,deleteUser} from 'firebase/auth';
+import {getFirestore,doc,getDoc,getDocs,setDoc,updateDoc,collection,query,where,orderBy,limit,startAfter,serverTimestamp,runTransaction,connectFirestoreEmulator,writeBatch} from 'firebase/firestore';
 import {initializeAppCheck,ReCaptchaV3Provider} from 'firebase/app-check';
 let db,auth,sessionCallback;
 export let session={user:null,role:'member'};
@@ -65,3 +65,15 @@ export async function saveAlbum(data,id){
 export async function albumPhotos(albumId){return (await getDocs(query(collection(db,'albums',albumId,'photos'),...(staff()?[]:[where('hidden','==',false)]),orderBy('position'),limit(200)))).docs.map(s=>({id:s.id,...s.data()}));}
 export async function savePhoto(albumId,data,id){const ref=id?doc(db,'albums',albumId,'photos',id):doc(collection(db,'albums',albumId,'photos'));await setDoc(ref,{...data,updatedAt:serverTimestamp()});return ref.id;}
 export async function archivePhoto(albumId,id){await updateDoc(doc(db,'albums',albumId,'photos',id),{hidden:true,updatedAt:serverTimestamp()});}
+
+export async function deleteAccount(password){
+  const user=auth.currentUser;
+  if(!user)throw Error('Please sign in before deleting your account.');
+  await reauthenticateWithCredential(user,EmailAuthProvider.credential(user.email,password));
+  await user.getIdToken(true);
+  const batch=writeBatch(db);
+  for(const collection of ['profiles','memberAdmin','roles'])batch.delete(doc(db,collection,user.uid));
+  await batch.commit();
+  try {await deleteUser(user);}
+  catch(error){throw Error('Your contact profile and directory information have been removed, but your login could not be deleted. Please retry Delete my account to finish. '+(error.code||''));}
+}

@@ -25,9 +25,10 @@ export const AREAS = [
   {id:'art-education', label:'Visual Arts Education', color:'#A34165', ink:'#FFFFFF'}
 ];
 export const CONNECTIONS = [
-  {id:'board',label:'Board member / past board service'},
-  {id:'applicant',label:'Interested in joining the board'},
-  {id:'supporter',label:'Stay connected / receive updates'},
+  {id:'active',label:'Current active board member'},
+  {id:'board',label:'Board service (current or past; please update)'},
+  {id:'applicant',label:'Applying to join the board'},
+  {id:'supporter',label:'Newsletters only'},
   {id:'faculty',label:'TAD faculty'}
 ];
 export const SITE_PHOTOS = [

@@ -1,4 +1,4 @@
-import {AREAS, areaName, connectionName, statusFor} from './key.js';
+import {CONNECTIONS,AREAS, areaName, connectionName, statusFor} from './key.js';
 export const effectiveStatus = (status,role) => ['faculty','admin'].includes(role) ? 'ineligible' : (status||'not-started');
 export const emailValid = value => /^[^\s@;,<>]+@[^\s@;,<>]+\.[^\s@;,<>]+$/.test(value);
 export function imageURL(value) {
@@ -20,7 +20,7 @@ export function sortContacts(rows,key='lastName',direction=1){
 export function recipients(rows,mode='newsletter') {
   const seen=new Set(); const eligible=[];let excluded=0;
   for(const r of rows){
-    if(['on-hold','removed','ineligible'].includes(effectiveStatus(r.status,r.role)) || (mode==='newsletter'&&!r.newsletterOptIn) || !emailValid(r.email||'')){excluded++;continue;}
+    if(['on-hold','removed','ineligible'].includes(effectiveStatus(r.status,r.role)) || (mode==='newsletter'&&!r.newsletterOptIn) || (mode==='board'&&r.connection==='supporter') || !emailValid(r.email||'')){excluded++;continue;}
     const email=r.email.trim().toLowerCase();if(!seen.has(email)){seen.add(email);eligible.push(email);}
   }
   return {emails:eligible,excluded};
@@ -34,6 +34,7 @@ export function validateProfile(p){
   if(!p.firstName.trim()||!p.lastName.trim())return 'Please enter your first and last name.';
   if(!emailValid(p.email))return 'Please enter a valid contact email address.';
   if(p.altEmail&&!emailValid(p.altEmail))return 'Please enter one valid alternate email address.';
+  if(!CONNECTIONS.some(c=>c.id===p.connection))return 'Please choose your connection to TAD.';
   if(!p.areas.length||p.areas.some(id=>!AREAS.some(a=>a.id===id)))return 'Please select at least one program area.';
   return '';
 }
