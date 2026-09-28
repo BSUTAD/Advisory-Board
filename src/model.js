@@ -1,4 +1,5 @@
 import {AREAS, areaName, connectionName, statusFor} from './key.js';
+export const effectiveStatus = (status,role) => ['faculty','admin'].includes(role) ? 'ineligible' : (status||'not-started');
 export const emailValid = value => /^[^\s@;,<>]+@[^\s@;,<>]+\.[^\s@;,<>]+$/.test(value);
 export function imageURL(value) {
   if (/^assets\/[a-zA-Z0-9._-]+\.(png|jpe?g|webp)$/i.test(value)) return value;
@@ -19,7 +20,7 @@ export function sortContacts(rows,key='lastName',direction=1){
 export function recipients(rows,mode='newsletter') {
   const seen=new Set(); const eligible=[];let excluded=0;
   for(const r of rows){
-    if(['on-hold','removed'].includes(r.status) || (mode==='newsletter'&&!r.newsletterOptIn) || !emailValid(r.email||'')){excluded++;continue;}
+    if(['on-hold','removed','ineligible'].includes(effectiveStatus(r.status,r.role)) || (mode==='newsletter'&&!r.newsletterOptIn) || !emailValid(r.email||'')){excluded++;continue;}
     const email=r.email.trim().toLowerCase();if(!seen.has(email)){seen.add(email);eligible.push(email);}
   }
   return {emails:eligible,excluded};
