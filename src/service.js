@@ -33,17 +33,23 @@ export const changeLoginEmail=email=>verifyBeforeUpdateEmail(auth.currentUser,em
 export const verifyEmail=()=>sendEmailVerification(auth.currentUser,actionSettings());
 export async function refreshSession(){await reload(auth.currentUser);await auth.currentUser.getIdToken(true);session.user=auth.currentUser;if(session.user.emailVerified){const r=await getDoc(doc(db,'roles',session.user.uid));session.role=r.exists()?r.data().role:'member';}sessionCallback(session);}
 export async function profile(id=session.user.uid){const s=await getDoc(doc(db,'profiles',id));return s.exists()?{id:s.id,...s.data()}:null;}
+export async function recordProfileAccess(){
+  await setDoc(doc(db,'memberActivity',session.user.uid),{lastAccessAt:serverTimestamp()},{merge:true});
+}
 export async function saveProfile(p,id=session.user.uid){
   return runTransaction(db,async tx=>{const ref=doc(db,'profiles',id);const before=await tx.get(ref);const now=serverTimestamp();
     if(before.exists())tx.update(ref,{...p,...(id===session.user.uid?{accountEmail:session.user.email}:{}),updatedAt:now,updatedBy:session.user.uid});
     else tx.set(ref,{...p,accountEmail:session.user.email,createdAt:now,updatedAt:now,updatedBy:session.user.uid});
+    if(id===session.user.uid)tx.set(doc(db,'memberActivity',id),{lastAccessAt:now,lastSelfUpdateAt:now},{merge:true});
   });
 }
 export async function directory(){
   const rows=[];let after=null;
   do {const q=query(collection(db,'profiles'),orderBy('__name__'),...(after?[startAfter(after)]:[]),limit(250));const page=await getDocs(q);rows.push(...page.docs.map(s=>({id:s.id,...s.data()})));after=page.size===250?page.docs.at(-1):null;}while(after);
   const meta=await getDocs(query(collection(db,'memberAdmin'),limit(2000)));const map=new Map(meta.docs.map(s=>[s.id,s.data()]));
-  return Promise.all(rows.map(async r=>{const role=await accountRole(r.id);return {...r,role,statusOverride:map.get(r.id)?.statusOverride===true,status:effectiveStatus(map.get(r.id)?.status,role,map.get(r.id)?.statusOverride===true),notes:map.get(r.id)?.notes||''};}));
+  const activity=new Map();let cursor=null;
+  do {const result=await getDocs(query(collection(db,'memberActivity'),orderBy('__name__'),...(cursor?[startAfter(cursor)]:[]),limit(250)));for(const d of result.docs)activity.set(d.id,d.data());cursor=result.size===250?result.docs.at(-1):null;}while(cursor);
+  return Promise.all(rows.map(async r=>{const role=await accountRole(r.id);return {...r,...activity.get(r.id),role,statusOverride:map.get(r.id)?.statusOverride===true,status:effectiveStatus(map.get(r.id)?.status,role,map.get(r.id)?.statusOverride===true),notes:map.get(r.id)?.notes||''};}));
 }
 export async function accountRole(id){const s=await getDoc(doc(db,'roles',id));return s.exists()?s.data().role:'member';}
 export async function saveAdminRecord(id,p,metadata,expectedUpdatedAt){
@@ -71,7 +77,7 @@ export async function deleteAccount(password){
   await reauthenticateWithCredential(user,EmailAuthProvider.credential(user.email,password));
   await user.getIdToken(true);
   const batch=writeBatch(db);
-  for(const collection of ['profiles','memberAdmin','roles'])batch.delete(doc(db,collection,user.uid));
+  for(const collection of ['profiles','memberAdmin','roles','memberActivity'])batch.delete(doc(db,collection,user.uid));
   await batch.commit();
   try {await deleteUser(user);}
   catch(error){throw Error('Your contact profile and directory information have been removed, but your login could not be deleted. Please retry Delete my account to finish. '+(error.code||''));}
@@ -101,6 +107,7 @@ export async function claimInvitation(id,p){
     if(invite.data().loginEmail!==user.email.toLowerCase()||invite.data().expiresAt.toMillis()<Date.now())throw Error('Sign in with the verified invited email, or request a new invitation.');
     const now=serverTimestamp();
     tx.set(target,{...p,accountEmail:user.email,createdAt:now,updatedAt:now,updatedBy:user.uid});
+    tx.set(doc(db,'memberActivity',user.uid),{lastAccessAt:now,lastSelfUpdateAt:now},{merge:true});
     tx.delete(ref);
   });
 }

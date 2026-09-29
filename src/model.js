@@ -14,7 +14,7 @@ export function filterContacts(rows,{search='',areas=[],areaMode='any',status=''
   });
 }
 export function sortContacts(rows,key='lastName',direction=1){
-  const value=r=>key==='areas'?(r.areas||[]).map(areaName).join(', '):key==='status'?statusFor(r.status).label:key==='connection'?connectionName(r.connection):key==='updatedAt'?(r.updatedAt?.toMillis?.() || 0):r[key]??'';
+  const value=r=>key==='areas'?(r.areas||[]).map(areaName).join(', '):key==='status'?statusFor(r.status).label:key==='connection'?connectionName(r.connection):['updatedAt','lastAccessAt','lastSelfUpdateAt'].includes(key)?(r[key]?.toMillis?.() || 0):r[key]??'';
   return [...rows].sort((a,b)=>typeof value(a)==='number'?(value(a)-value(b))*direction:String(value(a)).localeCompare(String(value(b)),undefined,{numeric:true,sensitivity:'base'})*direction);
 }
 export function recipients(rows,mode='newsletter') {
@@ -27,8 +27,8 @@ export function recipients(rows,mode='newsletter') {
 }
 export function csv(rows){
   const cell=value=>{let s=String(value??'');if(/^[=+@\-\t\r]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"';};
-  const fields=['First name','Last name','Email','Alternate email','Phone','Company','Job title','Location','Areas','Connection','Status','Newsletter opt-in'];
-  return '\uFEFF'+[fields,...rows.map(r=>[r.firstName,r.lastName,r.email,r.altEmail,r.phone,r.company,r.jobTitle,r.location,(r.areas||[]).map(areaName).join('; '),connectionName(r.connection),statusFor(r.status).label,r.newsletterOptIn?'Yes':'No'])].map(r=>r.map(cell).join(',')).join('\r\n');
+  const fields=['First name','Last name','Email','Alternate email','Phone','Company','Job title','Location','Areas','Connection','Status','Newsletter opt-in','Last accessed (UTC)','Last self-update (UTC)'];
+  return '\uFEFF'+[fields,...rows.map(r=>[r.firstName,r.lastName,r.email,r.altEmail,r.phone,r.company,r.jobTitle,r.location,(r.areas||[]).map(areaName).join('; '),connectionName(r.connection),statusFor(r.status).label,r.newsletterOptIn?'Yes':'No',r.lastAccessAt?.toDate?.().toISOString()||'Not recorded',r.lastSelfUpdateAt?.toDate?.().toISOString()||'Not recorded'])].map(r=>r.map(cell).join(',')).join('\r\n');
 }
 export function validateProfile(p){
   if(!p.firstName.trim()||!p.lastName.trim())return 'Please enter your first and last name.';
