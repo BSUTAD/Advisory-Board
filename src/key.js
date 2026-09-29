@@ -9,7 +9,7 @@ export const STATUSES = [
   {id:'needs-immediate-action', label:'Needs Immediate Action', color:'#C00000', ink:'#FFFFFF', meaning:'Membership is in jeopardy or the contact needs immediate follow up.'},
   {id:'very-active', label:'Very Active', color:'#70A642', ink:'#14210A', meaning:'This contact is a leader and very responsive.'},
   {id:'on-hold', label:'On Hold', color:'#A5A5A5', ink:'#202020', meaning:'Membership temporarily paused.'},
-  {id:'ineligible', label:'Ineligible', color:'#705080', ink:'#FFFFFF', meaning:'Not eligible for advisory board membership. Automatically applies to faculty and administrator accounts.'},
+  {id:'ineligible', label:'Ineligible', color:'#705080', ink:'#FFFFFF', meaning:'Not eligible for advisory board membership. Default for faculty and administrator accounts. Administrators can change this status.'},
   {id:'removed', label:'Removed', color:'#555555', ink:'#FFFFFF', meaning:'Retired or moved on from our board.'}
 ];
 export const AREAS = [

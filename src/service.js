@@ -43,15 +43,14 @@ export async function directory(){
   const rows=[];let after=null;
   do {const q=query(collection(db,'profiles'),orderBy('__name__'),...(after?[startAfter(after)]:[]),limit(250));const page=await getDocs(q);rows.push(...page.docs.map(s=>({id:s.id,...s.data()})));after=page.size===250?page.docs.at(-1):null;}while(after);
   const meta=await getDocs(query(collection(db,'memberAdmin'),limit(2000)));const map=new Map(meta.docs.map(s=>[s.id,s.data()]));
-  return Promise.all(rows.map(async r=>{const role=await accountRole(r.id);return {...r,role,status:effectiveStatus(map.get(r.id)?.status,role),notes:map.get(r.id)?.notes||''};}));
+  return Promise.all(rows.map(async r=>{const role=await accountRole(r.id);return {...r,role,statusOverride:map.get(r.id)?.statusOverride===true,status:effectiveStatus(map.get(r.id)?.status,role,map.get(r.id)?.statusOverride===true),notes:map.get(r.id)?.notes||''};}));
 }
 export async function accountRole(id){const s=await getDoc(doc(db,'roles',id));return s.exists()?s.data().role:'member';}
 export async function saveAdminRecord(id,p,metadata,expectedUpdatedAt){
   await runTransaction(db,async tx=>{
     const ref=doc(db,'profiles',id), old=await tx.get(ref);if(!old.exists())throw Error('This contact is no longer available.');
     if((old.data().updatedAt?.toMillis?.()||0)!==(expectedUpdatedAt?.toMillis?.()||0))throw Error('This profile changed while you were editing. Close it and refresh the directory before saving.');
-    const roleDoc=await tx.get(doc(db,'roles',id));
-    metadata={...metadata,status:effectiveStatus(metadata.status,roleDoc.exists()?roleDoc.data().role:'member')};
+    metadata={...metadata,statusOverride:true};
     const now=serverTimestamp();tx.update(ref,{...p,updatedAt:now,updatedBy:session.user.uid});
     tx.set(doc(db,'memberAdmin',id),{...metadata,updatedAt:now,updatedBy:session.user.uid});
   });
