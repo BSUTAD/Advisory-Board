@@ -51,3 +51,14 @@ test('activity is private, owner-recorded, server-timed, and readable by faculty
  await assertFails(deleteDoc(doc(db('admin'),'memberActivity','member')));
  const recent=env.authenticatedContext('member',{auth_time:Math.floor(Date.now()/1000)}).firestore();await assertSucceeds(deleteDoc(doc(recent,'memberActivity','member')));
 });
+
+test('membership decisions are admin-only; reviewer interest requires a membership connection',async()=>{
+ const member=db('member');await assertSucceeds(updateDoc(doc(member,'profiles','member'),{connection:'applicant',reviewerInterest:true,updatedAt:serverTimestamp(),updatedBy:'member'}));
+ await assertFails(updateDoc(doc(member,'profiles','member'),{connection:'supporter',reviewerInterest:true,updatedAt:serverTimestamp(),updatedBy:'member'}));
+ await assertSucceeds(updateDoc(doc(member,'profiles','member'),{connection:'applicant',reviewerInterest:false,updatedAt:serverTimestamp(),updatedBy:'member'}));
+ const meta={status:'very-active',notes:'',membershipDecision:'approved',membershipReviewedAt:serverTimestamp(),membershipReviewedBy:'admin',updatedAt:serverTimestamp(),updatedBy:'admin'};
+ for(const who of ['member','faculty'])await assertFails(setDoc(doc(db(who),'memberAdmin','member'),{...meta,updatedBy:who}));
+ await assertSucceeds(setDoc(doc(db('admin'),'memberAdmin','member'),meta));await assertSucceeds(getDoc(doc(db('faculty'),'memberAdmin','member')));
+ await assertFails(updateDoc(doc(member,'profiles','member'),{membershipDecision:'approved',updatedAt:serverTimestamp(),updatedBy:'member'}));
+ await assertFails(setDoc(doc(db('admin'),'memberAdmin','member'),{...meta,membershipDecision:'invented'}));
+});

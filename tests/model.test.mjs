@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {recipients,filterContacts,sortContacts,imageURL,csv,validateProfile,effectiveStatus} from '../src/model.js';
+import {recipients,filterContacts,sortContacts,imageURL,csv,validateProfile,effectiveStatus,membershipDecision,reviewerEligible} from '../src/model.js';
 import {AREAS,STATUSES} from '../src/key.js';
 const base={connection:'active',firstName:'A',lastName:'Person',email:'a@example.org',altEmail:'',areas:['graphic','illustration-animation'],newsletterOptIn:true,status:'very-active'};
 test('newsletter recipients respect consent, holds/removals, validation and duplicates',()=>{
@@ -23,4 +23,14 @@ test('member activity sorts chronologically and exports missing activity honestl
  assert.deepEqual(sortContacts(rows,'lastAccessAt',-1).map(r=>r.id),['recent','old','unknown']);
  assert.deepEqual(sortContacts(rows,'lastSelfUpdateAt',-1).map(r=>r.id),['recent','unknown','old']);
  assert.match(csv(rows),/Last accessed \(UTC\)/);assert.match(csv(rows),/1970-01-01T00:00:03.000Z/);assert.match(csv(rows),/Not recorded/);
+});
+
+test('membership requests and portfolio review eligibility are independent of account access',()=>{
+ const applicant={id:'applicant',connection:'applicant',reviewerInterest:true,email:'reviewer@example.org',status:'very-active',newsletterOptIn:false};
+ assert.equal(membershipDecision(applicant),'pending');assert.equal(membershipDecision({...applicant,membershipDecision:'not-requested'}),'pending');
+ assert.equal(membershipDecision({connection:'active'}),'unreviewed');assert.equal(reviewerEligible({...applicant,connection:'active'}),false);
+ assert.equal(reviewerEligible({...applicant,membershipDecision:'approved'}),true);assert.equal(reviewerEligible({...applicant,membershipDecision:'denied'}),false);
+ assert.equal(reviewerEligible({...applicant,membershipDecision:'approved',reviewerInterest:false}),false);
+ assert.deepEqual(recipients([applicant,{...applicant,membershipDecision:'approved'}],'reviewer').emails,['reviewer@example.org']);
+ assert.equal(filterContacts([applicant],{membership:'pending'}).length,1);assert.equal(filterContacts([applicant],{reviewer:'eligible'}).length,0);
 });

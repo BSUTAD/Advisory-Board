@@ -39,3 +39,13 @@ test('profile visits are tracked only on own account and staff see sortable acti
  for(const role of ['admin','faculty']){await w.testSession(role);assert.ok(d.querySelector('[data-sort=lastAccessAt]'));assert.ok(d.querySelector('[data-sort=lastSelfUpdateAt]'));assert.match(d.querySelector('#directory-rows').textContent,/Not recorded/);}
  await w.happyDOM.abort();
 });
+
+test('reviewer selection includes membership; membership can be selected without reviewing',async()=>{
+ const w=await open('account'),d=w.document,board=d.querySelector('[name=boardInterest]'),reviewer=d.querySelector('[name=reviewerInterest]'),connection=d.querySelector('[name=connection]');
+ board.checked=false;board.dispatchEvent(new w.Event('change'));assert.equal(connection.value,'supporter');
+ reviewer.checked=true;reviewer.dispatchEvent(new w.Event('change'));assert.equal(board.checked,true);assert.equal(connection.value,'applicant');
+ reviewer.checked=false;reviewer.dispatchEvent(new w.Event('change'));assert.equal(board.checked,true);
+ d.querySelector('#profile-form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,20));assert.equal(w.savedProfile.reviewerInterest,false);assert.equal(w.savedProfile.connection,'applicant');
+ await w.happyDOM.abort();
+ const dir=await open('directory'),doc=dir.document;doc.querySelector('[data-edit]').click();await new Promise(r=>setTimeout(r,20));doc.querySelector('#edit-membership').value='approved';doc.querySelector('#edit-contact-form').dispatchEvent(new dir.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,20));assert.equal(dir.savedAdmin[2].membershipDecision,'approved');await dir.happyDOM.abort();
+});
