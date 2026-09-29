@@ -1,6 +1,6 @@
 # Status override fix
 
-Prepared September 29, 2026. Not activated yet; Firebase publishing requires Google sign-in, which automatic browser approval review blocked.
+Released September 29, 2026. Firebase rules published at 2:58 PM Central; this commit activates the matching portal bundle.
 
 Cause: faculty/admin role forced effective status to Ineligible, disabled the edit dropdown, and replaced submitted statuses with Ineligible on save.
 
@@ -8,4 +8,4 @@ Fix: keep Ineligible as the default unless an admin explicitly saves a status ov
 
 Validation: 19 model/UI tests and 19 Firestore emulator rules tests passed. No actual profiles or roles changed.
 
-Release: publish firestore.rules in Firebase project tad-advisory-board, then run npm run build and publish portal.js to GitHub Pages. Source, rules and tests are committed; the old live portal.js remains until rules publish. No homepage, page markup or stylesheet changes.
+Release: firestore.rules published in Firebase project tad-advisory-board before uploading the built portal.js to GitHub Pages. Source, rules and tests are committed. No homepage, page markup or stylesheet changes.
