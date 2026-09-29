@@ -43,7 +43,8 @@ service cloud.firestore {
       allow create,update: if admin()
         && exists(/databases/$(database)/documents/profiles/$(uid))
         && request.resource.data.keys().hasAll(['status','notes','updatedAt','updatedBy'])
-        && request.resource.data.keys().hasOnly(['status','notes','updatedAt','updatedBy'])
+        && request.resource.data.keys().hasOnly(['status','notes','updatedAt','updatedBy','statusOverride'])
+        && (!('statusOverride' in request.resource.data) || request.resource.data.statusOverride is bool)
         && request.resource.data.status in ['not-started','waiting-for-reply','ready-for-contact','scheduled','needs-follow-up','needs-immediate-action','very-active','on-hold','removed','ineligible']
         && str(request.resource.data.notes,3000)
         && request.resource.data.updatedAt==request.time && request.resource.data.updatedBy==request.auth.uid;
