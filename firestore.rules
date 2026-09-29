@@ -13,7 +13,8 @@ service cloud.firestore {
     function image(v) { return str(v,2000) && (v.matches('^https://[^\\s<>]+$') || v.matches('^assets/[a-zA-Z0-9._-]+[.](jpg|jpeg|png|webp)$')); }
     function validProfile(d) {
       return d.keys().hasAll(['firstName','lastName','email','altEmail','phone','company','jobTitle','location','website','connection','specialties','bio','areas','newsletterOptIn','accountEmail','createdAt','updatedAt','updatedBy'])
-        && d.keys().hasOnly(['firstName','lastName','email','altEmail','phone','company','jobTitle','location','website','connection','specialties','bio','areas','newsletterOptIn','accountEmail','createdAt','updatedAt','updatedBy'])
+        && d.keys().hasOnly(['firstName','lastName','email','altEmail','phone','company','jobTitle','location','website','connection','specialties','bio','areas','newsletterOptIn','accountEmail','createdAt','updatedAt','updatedBy','reviewerInterest'])
+        && (!('reviewerInterest' in d) || (d.reviewerInterest is bool && (!d.reviewerInterest || d.connection in ['active','board','applicant'])))
         && str(d.firstName,100) && d.firstName.size()>0 && str(d.lastName,100) && d.lastName.size()>0
         && email(d.email) && (d.altEmail=='' || email(d.altEmail)) && email(d.accountEmail)
         && str(d.phone,50) && str(d.company,200) && str(d.jobTitle,200) && str(d.location,200)
@@ -63,7 +64,10 @@ service cloud.firestore {
       allow create,update: if admin()
         && exists(/databases/$(database)/documents/profiles/$(uid))
         && request.resource.data.keys().hasAll(['status','notes','updatedAt','updatedBy'])
-        && request.resource.data.keys().hasOnly(['status','notes','updatedAt','updatedBy','statusOverride'])
+        && request.resource.data.keys().hasOnly(['status','notes','updatedAt','updatedBy','statusOverride','membershipDecision','membershipReviewedAt','membershipReviewedBy'])
+        && (!('membershipDecision' in request.resource.data) || request.resource.data.membershipDecision in ['not-requested','unreviewed','pending','approved','denied'])
+        && (!('membershipReviewedAt' in request.resource.data) || request.resource.data.membershipReviewedAt is timestamp)
+        && (!('membershipReviewedBy' in request.resource.data) || str(request.resource.data.membershipReviewedBy,128))
         && (!('statusOverride' in request.resource.data) || request.resource.data.statusOverride is bool)
         && request.resource.data.status in ['not-started','waiting-for-reply','ready-for-contact','scheduled','needs-follow-up','needs-immediate-action','very-active','on-hold','removed','ineligible']
         && str(request.resource.data.notes,3000)
