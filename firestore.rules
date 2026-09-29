@@ -38,6 +38,26 @@ service cloud.firestore {
           || (own(uid) && request.resource.data.accountEmail==request.auth.token.email));
       allow delete: if deletingOwn(uid);
     }
+    match /memberActivity/{uid} {
+      allow get: if own(uid) || staff();
+      allow list: if staff() && request.query.limit<=250;
+      function validActivity() {
+        return request.resource.data.keys().hasAll(['lastAccessAt'])
+          && request.resource.data.keys().hasOnly(['lastAccessAt','lastSelfUpdateAt'])
+          && request.resource.data.lastAccessAt==request.time
+          && existsAfter(/databases/$(database)/documents/profiles/$(uid));
+      }
+      function savedOwnProfile() {
+        return request.resource.data.lastSelfUpdateAt==request.time
+          && getAfter(/databases/$(database)/documents/profiles/$(uid)).data.updatedAt==request.time
+          && getAfter(/databases/$(database)/documents/profiles/$(uid)).data.updatedBy==uid;
+      }
+      allow create: if own(uid) && validActivity()
+        && (!('lastSelfUpdateAt' in request.resource.data) || savedOwnProfile());
+      allow update: if own(uid) && validActivity()
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastSelfUpdateAt']) || savedOwnProfile());
+      allow delete: if deletingOwn(uid);
+    }
     match /memberAdmin/{uid} {
       allow read: if staff();
       allow create,update: if admin()
