@@ -16,3 +16,11 @@ test('staff are automatically ineligible and excluded from both email modes',()=
 test('newsletters-only contacts stay out of board coordination',()=>{const p={...base,connection:'supporter'};assert.equal(recipients([p],'board').emails.length,0);assert.equal(recipients([p]).emails.length,1);assert.equal(validateProfile({...base,connection:'invented'}),'Please choose your connection to TAD.');});
 
 test('explicit admin status overrides survive staff defaults and recipient filtering',()=>{for(const role of ['faculty','admin']){assert.equal(effectiveStatus('ready-for-contact',role,true),'ready-for-contact');assert.equal(recipients([{...base,role,statusOverride:true}]).emails.length,1);assert.equal(recipients([{...base,role,status:'ineligible',statusOverride:true}]).emails.length,0);}});
+
+test('member activity sorts chronologically and exports missing activity honestly',()=>{
+ const stamp=ms=>({toMillis:()=>ms,toDate:()=>new Date(ms)});
+ const rows=[{id:'recent',lastAccessAt:stamp(2000),lastSelfUpdateAt:stamp(3000)},{id:'unknown'},{id:'old',lastAccessAt:stamp(1000)}];
+ assert.deepEqual(sortContacts(rows,'lastAccessAt',-1).map(r=>r.id),['recent','old','unknown']);
+ assert.deepEqual(sortContacts(rows,'lastSelfUpdateAt',-1).map(r=>r.id),['recent','unknown','old']);
+ assert.match(csv(rows),/Last accessed \(UTC\)/);assert.match(csv(rows),/1970-01-01T00:00:03.000Z/);assert.match(csv(rows),/Not recorded/);
+});

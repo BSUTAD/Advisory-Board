@@ -5,6 +5,7 @@ export let session={user:{uid:'admin',email:'admin@example.invalid',emailVerifie
 export const staff=()=>['admin','faculty'].includes(session.role);export const admin=()=>session.role==='admin';
 export const connect=async cb=>{window.testSession=async role=>{session.role=role;session.user=role==='guest'?null:{uid:role,email:role+'@example.invalid',emailVerified:role!=='unverified'};await cb(session);};await cb(session);};
 const p={role:'faculty',statusOverride:true,id:'sample',firstName:'Alex',lastName:'Sample',email:'alex@example.invalid',altEmail:'',company:'Example Studio',phone:'',jobTitle:'Designer',location:'',website:'',connection:'board',specialties:'Motion graphics',bio:'',areas:['graphic','illustration-animation'],newsletterOptIn:true,status:'very-active',notes:''};
+export const recordProfileAccess=async()=>{window.profileAccessRecorded=true;};
 export const profile=async()=>window.noProfile?null:p;
 export const pendingInvitations=async()=>[];export const createInvitation=async()=>'';export const cancelInvitation=async()=>{};export const invitation=async id=>({id,profile:{...p,newsletterOptIn:false}});export const claimInvitation=async(id,p)=>{window.claimed={id,p};};export const directory=async()=>[p,{...p,id:'another',firstName:'Bailey',lastName:'Example',email:'bailey@example.invalid',areas:['exhibit'],newsletterOptIn:false,status:'waiting-for-reply'}];
 export const accountRole=async()=> 'member';export const saveProfile=async p=>{window.savedProfile=p;};
@@ -31,3 +32,10 @@ test('verified invited user reviews prefill and claims with chosen newsletter co
 test('an invitation never overwrites an existing contact profile',async()=>{const w=await open('account'),d=w.document;w.sessionStorage.setItem('tad-invite','abcdefghijklmnopqrst');await w.testSession('member');await new Promise(r=>setTimeout(r,30));assert.match(d.querySelector('#profile-feedback').textContent,/kept your existing information/);assert.equal(w.claimed,undefined);await w.happyDOM.abort();});
 
 test('admin can edit staff board status and internal notes',async()=>{const w=await open('directory'),d=w.document;d.querySelector('[data-edit="sample"]').click();await new Promise(r=>setTimeout(r,30));assert.equal(d.querySelector('#edit-status').disabled,false);d.querySelector('#edit-status').value='ready-for-contact';d.querySelector('#edit-contact-form [name=notes]').value='Status reviewed by admin';d.querySelector('#edit-contact-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,30));assert.equal(w.savedAdmin[2].status,'ready-for-contact');assert.equal(w.savedAdmin[2].notes,'Status reviewed by admin');await w.happyDOM.abort();});
+
+test('profile visits are tracked only on own account and staff see sortable activity columns',async()=>{
+ const account=await open('account');assert.equal(account.profileAccessRecorded,true);await account.happyDOM.abort();
+ const w=await open('directory'),d=w.document;assert.equal(w.profileAccessRecorded,undefined);
+ for(const role of ['admin','faculty']){await w.testSession(role);assert.ok(d.querySelector('[data-sort=lastAccessAt]'));assert.ok(d.querySelector('[data-sort=lastSelfUpdateAt]'));assert.match(d.querySelector('#directory-rows').textContent,/Not recorded/);}
+ await w.happyDOM.abort();
+});

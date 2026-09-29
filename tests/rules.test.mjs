@@ -32,3 +32,22 @@ test('claim consumes invitation only with atomic own profile creation',async()=>
 test('expired and canceled invitations cannot be claimed, and existing profiles are protected',async()=>{await env.withSecurityRulesDisabled(async c=>{await setDoc(doc(c.firestore(),'invitations','expired'),{...inviteData('expired@example.org'),expiresAt:Timestamp.fromMillis(0)});});await assertFails(getDoc(doc(db('expired'),'invitations','expired')));await assertSucceeds(setDoc(doc(db('admin'),'invitations','cancel'),inviteData('cancel@example.org')));await assertSucceeds(deleteDoc(doc(db('admin'),'invitations','cancel')));await assertFails(deleteDoc(doc(db('cancel'),'invitations','cancel')));await assertSucceeds(setDoc(doc(db('admin'),'invitations','duplicate'),inviteData('other@example.org')));await assertFails(deleteDoc(doc(db('other'),'invitations','duplicate')));});
 
 test('status overrides are writable only by admins',async()=>{const meta={status:'ready-for-contact',notes:'Reviewed',statusOverride:true,updatedAt:serverTimestamp(),updatedBy:'admin'};await assertSucceeds(setDoc(doc(db('admin'),'memberAdmin','faculty'),meta));for(const uid of ['faculty','member'])await assertFails(setDoc(doc(db(uid),'memberAdmin',uid),{...meta,updatedBy:uid}));await assertFails(setDoc(doc(db('admin'),'memberAdmin','faculty'),{...meta,statusOverride:'yes'}));});
+
+test('activity is private, owner-recorded, server-timed, and readable by faculty/admin',async()=>{
+ const d=db('member'),ref=doc(d,'memberActivity','member');
+ await assertSucceeds(setDoc(ref,{lastAccessAt:serverTimestamp()},{merge:true}));
+ for(const who of ['faculty','admin'])await assertSucceeds(getDocs(query(collection(db(who),'memberActivity'),limit(250))));
+ for(const other of [db(),db('stranger'),db('member',false)])await assertFails(getDoc(doc(other,'memberActivity','member')));
+ for(const who of ['faculty','admin','other'])await assertFails(setDoc(doc(db(who),'memberActivity','member'),{lastAccessAt:serverTimestamp()}));
+ await assertFails(setDoc(ref,{lastAccessAt:Timestamp.fromMillis(0)},{merge:true}));
+ await assertFails(setDoc(ref,{lastAccessAt:serverTimestamp(),lastSelfUpdateAt:serverTimestamp()},{merge:true}));
+ await assertFails(setDoc(doc(db('no-profile'),'memberActivity','no-profile'),{lastAccessAt:serverTimestamp()}));
+ const b=writeBatch(d);b.update(doc(d,'profiles','member'),{company:'Self updated',updatedAt:serverTimestamp(),updatedBy:'member'});b.set(ref,{lastAccessAt:serverTimestamp(),lastSelfUpdateAt:serverTimestamp()},{merge:true});await assertSucceeds(b.commit());
+ const saved=(await getDoc(ref)).data().lastSelfUpdateAt.toMillis();
+ await assertSucceeds(setDoc(ref,{lastAccessAt:serverTimestamp()},{merge:true}));
+ await assertSucceeds(updateDoc(doc(db('admin'),'profiles','member'),{company:'Staff update',updatedAt:serverTimestamp(),updatedBy:'admin'}));
+ if((await getDoc(ref)).data().lastSelfUpdateAt.toMillis()!==saved)throw Error('Member activity changed on staff update');
+ await assertFails(setDoc(ref,{lastAccessAt:serverTimestamp()}));
+ await assertFails(deleteDoc(doc(db('admin'),'memberActivity','member')));
+ const recent=env.authenticatedContext('member',{auth_time:Math.floor(Date.now()/1000)}).firestore();await assertSucceeds(deleteDoc(doc(recent,'memberActivity','member')));
+});
