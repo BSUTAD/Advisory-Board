@@ -1,4 +1,4 @@
-import {effectiveStatus} from './model.js';
+import {effectiveStatus,membershipDecision} from './model.js';
 import {initializeApp} from 'firebase/app';
 import {getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,sendEmailVerification,sendPasswordResetEmail,reload,connectAuthEmulator,updatePassword,verifyBeforeUpdateEmail,EmailAuthProvider,reauthenticateWithCredential,deleteUser} from 'firebase/auth';
 import {getFirestore,doc,getDoc,getDocs,setDoc,updateDoc,collection,query,where,orderBy,limit,startAfter,serverTimestamp,runTransaction,connectFirestoreEmulator,writeBatch,deleteDoc,Timestamp} from 'firebase/firestore';
@@ -49,14 +49,16 @@ export async function directory(){
   const meta=await getDocs(query(collection(db,'memberAdmin'),limit(2000)));const map=new Map(meta.docs.map(s=>[s.id,s.data()]));
   const activity=new Map();let cursor=null;
   do {const result=await getDocs(query(collection(db,'memberActivity'),orderBy('__name__'),...(cursor?[startAfter(cursor)]:[]),limit(250)));for(const d of result.docs)activity.set(d.id,d.data());cursor=result.size===250?result.docs.at(-1):null;}while(cursor);
-  return Promise.all(rows.map(async r=>{const role=await accountRole(r.id);return {...r,...activity.get(r.id),role,statusOverride:map.get(r.id)?.statusOverride===true,status:effectiveStatus(map.get(r.id)?.status,role,map.get(r.id)?.statusOverride===true),notes:map.get(r.id)?.notes||''};}));
+  return Promise.all(rows.map(async r=>{const role=await accountRole(r.id);return {...r,...activity.get(r.id),role,membershipDecision:membershipDecision({...r,membershipDecision:map.get(r.id)?.membershipDecision}),membershipReviewedAt:map.get(r.id)?.membershipReviewedAt,statusOverride:map.get(r.id)?.statusOverride===true,status:effectiveStatus(map.get(r.id)?.status,role,map.get(r.id)?.statusOverride===true),notes:map.get(r.id)?.notes||''};}));
 }
 export async function accountRole(id){const s=await getDoc(doc(db,'roles',id));return s.exists()?s.data().role:'member';}
 export async function saveAdminRecord(id,p,metadata,expectedUpdatedAt){
   await runTransaction(db,async tx=>{
     const ref=doc(db,'profiles',id), old=await tx.get(ref);if(!old.exists())throw Error('This contact is no longer available.');
     if((old.data().updatedAt?.toMillis?.()||0)!==(expectedUpdatedAt?.toMillis?.()||0))throw Error('This profile changed while you were editing. Close it and refresh the directory before saving.');
-    metadata={...metadata,statusOverride:true};
+    const adminRef=doc(db,'memberAdmin',id),prior=await tx.get(adminRef);
+    const decisionChanged=metadata.membershipDecision && metadata.membershipDecision!==prior.data()?.membershipDecision;
+    metadata={...prior.data(),...metadata,statusOverride:true,...(decisionChanged?{membershipReviewedAt:serverTimestamp(),membershipReviewedBy:session.user.uid}:{})};
     const now=serverTimestamp();tx.update(ref,{...p,updatedAt:now,updatedBy:session.user.uid});
     tx.set(doc(db,'memberAdmin',id),{...metadata,updatedAt:now,updatedBy:session.user.uid});
   });
