@@ -36,5 +36,5 @@ fi
 for deploy_role in roles/firebasehosting.admin roles/serviceusage.serviceUsageConsumer; do
   gcloud projects add-iam-policy-binding "$project_id" --member="serviceAccount:$service_account" --role="$deploy_role" --condition=None --quiet >/dev/null
 done
-gcloud iam service-accounts add-iam-policy-binding "$service_account" --project="$project_id" --role=roles/iam.workloadIdentityUser --member="principal://iam.googleapis.com/projects/${project_number}/locations/global/workloadIdentityPools/${pool_id}/subject/repo:BSUTAD/Advisory-Board:ref:refs/heads/main" --quiet >/dev/null
+gcloud iam service-accounts add-iam-policy-binding "$service_account" --project="$project_id" --role=roles/iam.workloadIdentityUser --member="principalSet://iam.googleapis.com/projects/${project_number}/locations/global/workloadIdentityPools/${pool_id}/attribute.repository_id/1389756544" --quiet >/dev/null
 echo 'SETUP COMPLETE. GitHub publishing is authorized. Allow a few minutes for permissions to propagate, then run the Firebase workflow in GitHub Actions.'
