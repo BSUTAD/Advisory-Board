@@ -5,3 +5,5 @@ test-results/
 private-data/
 .env*
 hosting-dist/
+
+gha-creds-*.json
