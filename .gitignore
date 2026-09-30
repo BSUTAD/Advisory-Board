@@ -4,3 +4,4 @@ node_modules/
 test-results/
 private-data/
 .env*
+hosting-dist/

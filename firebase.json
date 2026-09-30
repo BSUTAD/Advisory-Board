@@ -1,4 +1,60 @@
 {
-  "firestore":{"rules":"firestore.rules","indexes":"firestore.indexes.json"},
-  "emulators":{"firestore":{"port":8080},"auth":{"port":9099},"ui":{"enabled":false},"singleProjectMode":true}
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "firestore": {
+      "port": 8080
+    },
+    "auth": {
+      "port": 9099
+    },
+    "ui": {
+      "enabled": false
+    },
+    "singleProjectMode": true
+  },
+  "hosting": {
+    "site": "tad-advisory-board",
+    "public": "hosting-dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/migration-ready.json",
+        "headers": [
+          {
+            "key": "Access-Control-Allow-Origin",
+            "value": "https://bsutad.github.io"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-store"
+          }
+        ]
+      },
+      {
+        "source": "**/*.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "/portal-config.json",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
+    ]
+  }
 }
