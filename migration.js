@@ -1,9 +1,12 @@
 /* Keep old bookmarks working. Redirect only when Firebase has the complete release. */
 (async function () {
-  if(location.hostname!=='bsutad.github.io')return;
-  const prefix='/Advisory-Board';
-  if(location.pathname!==prefix&&!location.pathname.startsWith(prefix+'/'))return;
-  const origin='https://tad-advisory-board.web.app';
+  const github=location.hostname==='bsutad.github.io';
+  const aliases=['tad-advisory-board.web.app','tad-advisory-board.firebaseapp.com','tad-advisory.firebaseapp.com'];
+  if(!github&&!aliases.includes(location.hostname))return;
+  const prefix=github?'/Advisory-Board':'';
+  if(github&&location.pathname!==prefix&&!location.pathname.startsWith(prefix+'/'))return;
+  if(location.pathname.startsWith('/__/'))return;
+  const origin='https://tad-advisory.web.app';
   try {
     const response=await fetch(origin+'/migration-ready.json',{cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(4000)});
     if(!response.ok)return;

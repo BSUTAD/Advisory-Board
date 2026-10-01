@@ -1,0 +1,17 @@
+{
+  "projects": {
+    "default": "tad-advisory-board"
+  },
+  "targets": {
+    "tad-advisory-board": {
+      "hosting": {
+        "primary": [
+          "tad-advisory"
+        ],
+        "legacy": [
+          "tad-advisory-board"
+        ]
+      }
+    }
+  }
+}
