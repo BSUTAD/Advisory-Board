@@ -46,7 +46,7 @@ jobs:
           workload_identity_provider: projects/759590399835/locations/global/workloadIdentityPools/advisory-github/providers/github
           service_account: github-hosting@tad-advisory-board.iam.gserviceaccount.com
       - name: Publish website
-        run: npx --no-install firebase deploy --only hosting --project tad-advisory-board --non-interactive
+        run: npx --no-install firebase deploy --only hosting:primary --project tad-advisory-board --non-interactive
       - name: Verify published revision
         env:
           EXPECTED_REVISION: ${{ github.sha }}
@@ -56,7 +56,7 @@ jobs:
           expected = os.environ['EXPECTED_REVISION']
           for attempt in range(6):
               try:
-                  url = 'https://tad-advisory-board.web.app/deployment.json?revision=' + expected
+                  url = 'https://tad-advisory.web.app/deployment.json?revision=' + expected
                   with urllib.request.urlopen(url, timeout=15) as response:
                       if json.load(response).get('revision') == expected:
                           print('Verified published revision:', expected)
@@ -67,3 +67,5 @@ jobs:
                   raise SystemExit('Published revision did not match this commit')
               time.sleep(5)
           PY
+      - name: Publish legacy address forwarding
+        run: npx --no-install firebase deploy --only hosting:legacy --project tad-advisory-board --non-interactive
